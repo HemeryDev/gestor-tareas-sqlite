@@ -11,9 +11,7 @@ async function main() {
   });
 }
 
-/
 if (process.env.VERCEL) {
-  
   module.exports = async (req, res) => {
     await ensureDbFile(DB_JSON_PATH);
     const app = createApp({ dbPath: DB_JSON_PATH });
@@ -26,4 +24,3 @@ if (process.env.VERCEL) {
     process.exitCode = 1;
   });
 }
-
