@@ -16,7 +16,7 @@ export default function EditTask() {
   const [endTimeStr, setEndTimeStr] = useState("09:00");
 
   useEffect(() => {
-    const taskToEdit = tasks.find(t => t.id === parseInt(id));
+    const taskToEdit = tasks.find(t => String(t.id) === String(id));
     if (taskToEdit) {
       setTitle(taskToEdit.title);
       setDescription(taskToEdit.description || "");
@@ -39,7 +39,7 @@ export default function EditTask() {
       return alert("La hora de fin debe ser posterior a la hora de inicio.");
     }
 
-    const ok = await editTask(parseInt(id), title, description, dateStr, timeStr, endTimeStr);
+    const ok = await editTask(id, title, description, dateStr, timeStr, endTimeStr);
     if (ok) navigate("/tareas");
   };
 

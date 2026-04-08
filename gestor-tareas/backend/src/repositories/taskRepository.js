@@ -1,69 +1,92 @@
-const { readDb, writeDb } = require("../db/jsonDb");
+const { PrismaClient } = require("@prisma/client");
+const { PrismaBetterSqlite3 } = require("@prisma/adapter-better-sqlite3");
+const path = require("path");
+const ApiError = require("../utils/ApiError");
 
-function normalizeTask(task) {
-  return {
-    ...task,
-    id: Number(task.id),
-    completed: Boolean(task.completed),
-  };
+const DB_PATH = path.join(__dirname, "../../prisma/dev.db");
+
+function createPrismaClient() {
+  const adapter = new PrismaBetterSqlite3({ url: `file:${DB_PATH}` });
+  return new PrismaClient({ adapter });
 }
 
-function createTaskRepository({ dbPath }) {
+/**
+ * Repositorio de Tareas — Operaciones CRUD contra SQLite vía Prisma ORM.
+ */
+function createTaskRepository() {
+  const prisma = createPrismaClient();
+
   return {
+    /**
+     * Lista todas las tareas almacenadas en la base de datos.
+     * @returns {Promise<Task[]>}
+     */
     async list() {
-      const db = await readDb(dbPath);
-      return db.tasks.map(normalizeTask);
+      return prisma.task.findMany();
     },
 
+    /**
+     * Crea una nueva tarea.
+     * @param {object} payload - Datos de la nueva tarea (validados previamente).
+     * @returns {Promise<Task>}
+     */
     async create(payload) {
-      const db = await readDb(dbPath);
-      const tasks = db.tasks.map(normalizeTask);
-      const maxId = tasks.reduce((acc, t) => Math.max(acc, t.id || 0), 0);
-      const newTask = normalizeTask({
-        id: maxId + 1,
-        title: payload.title ?? "",
-        description: payload.description ?? "",
-        date: payload.date ?? "",
-        time: payload.time ?? "",
-        endTime: payload.endTime ?? "",
-        completed: Boolean(payload.completed),
+      return prisma.task.create({
+        data: {
+          title: payload.title,
+          description: payload.description || "",
+          date: payload.date,
+          time: payload.time,
+          endTime: payload.endTime,
+          completed: Boolean(payload.completed),
+        },
       });
-      db.tasks = [...tasks, newTask];
-      await writeDb(dbPath, db);
-      return newTask;
     },
 
+    /**
+     * Actualiza una tarea existente por ID.
+     * @param {string} id - UUID de la tarea.
+     * @param {object} payload - Campos a actualizar.
+     * @returns {Promise<Task>}
+     */
     async update(id, payload) {
-      const db = await readDb(dbPath);
-      const tasks = db.tasks.map(normalizeTask);
-      const idx = tasks.findIndex((t) => t.id === id);
-      const existing = idx >= 0 ? tasks[idx] : { id };
-
-      const updated = normalizeTask({
-        ...existing,
-        ...payload,
-        id,
-      });
-
-      if (idx >= 0) tasks[idx] = updated;
-      else tasks.push(updated);
-
-      db.tasks = tasks;
-      await writeDb(dbPath, db);
-      return updated;
+      try {
+        return await prisma.task.update({
+          where: { id: String(id) },
+          data: {
+            ...(payload.title !== undefined && { title: payload.title }),
+            ...(payload.description !== undefined && { description: payload.description }),
+            ...(payload.date !== undefined && { date: payload.date }),
+            ...(payload.time !== undefined && { time: payload.time }),
+            ...(payload.endTime !== undefined && { endTime: payload.endTime }),
+            ...(payload.completed !== undefined && { completed: Boolean(payload.completed) }),
+          },
+        });
+      } catch (error) {
+        if (error.code === "P2025") {
+          throw new ApiError(404, "Tarea no encontrada");
+        }
+        throw error;
+      }
     },
 
+    /**
+     * Elimina una tarea por ID. Lanza 404 si no existe.
+     * @param {string} id - UUID de la tarea.
+     * @returns {Promise<{message: string}>}
+     */
     async remove(id) {
-      const db = await readDb(dbPath);
-      const tasks = db.tasks.map(normalizeTask);
-      const before = tasks.length;
-      db.tasks = tasks.filter((t) => t.id !== id);
-      const changes = before - db.tasks.length;
-      await writeDb(dbPath, db);
-      return { message: "Eliminado", changes };
+      try {
+        await prisma.task.delete({ where: { id: String(id) } });
+        return { message: "Tarea eliminada exitosamente" };
+      } catch (error) {
+        if (error.code === "P2025") {
+          throw new ApiError(404, "Tarea no encontrada");
+        }
+        throw error;
+      }
     },
   };
 }
 
 module.exports = { createTaskRepository };
-

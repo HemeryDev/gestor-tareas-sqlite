@@ -1,44 +1,45 @@
+const { successResponse } = require("../utils/response");
+
 function createTaskController(taskService) {
   return {
-    async list(req, res) {
+    async list(req, res, next) {
       try {
         const tasks = await taskService.list();
-        res.json(tasks);
+        successResponse(res, 200, tasks, "Tareas obtenidas exitosamente");
       } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
       }
     },
 
-    async create(req, res) {
+    async create(req, res, next) {
       try {
-        const created = await taskService.create(req.body || {});
-        res.json(created);
+        const created = await taskService.create(req.body);
+        successResponse(res, 201, created, "Tarea creada exitosamente");
       } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
       }
     },
 
-    async update(req, res) {
+    async update(req, res, next) {
       try {
-        const id = Number(req.params.id);
-        const updated = await taskService.update(id, req.body || {});
-        res.json(updated);
+        const { id } = req.params;
+        const updated = await taskService.update(id, req.body);
+        successResponse(res, 200, updated, "Tarea actualizada exitosamente");
       } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
       }
     },
 
-    async remove(req, res) {
+    async remove(req, res, next) {
       try {
-        const id = Number(req.params.id);
+        const { id } = req.params;
         const result = await taskService.remove(id);
-        res.json(result);
+        successResponse(res, 200, result, "Tarea eliminada exitosamente");
       } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
       }
     },
   };
 }
 
 module.exports = { createTaskController };
-

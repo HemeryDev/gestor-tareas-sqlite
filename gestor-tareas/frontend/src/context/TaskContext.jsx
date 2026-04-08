@@ -19,7 +19,8 @@ const requestJson = async (url, options) => {
   if (!res.ok) {
     throw new Error(await parseErrorMessage(res));
   }
-  return res.json();
+  const body = await res.json();
+  return body.data !== undefined ? body.data : body;
 };
 
 export const TaskProvider = ({ children }) => {
